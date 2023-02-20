@@ -1,22 +1,22 @@
 buildscript {
     repositories {
-        maven { url = "https://files.minecraftforge.net/maven" }
-        jcenter()
+        maven { url = "https://maven.minecraftforge.net" }
         mavenCentral()
+        jcenter()
     }
     dependencies {
-        classpath group: "net.minecraftforge.gradle", name: "ForgeGradle", version: "3.+", changing: true
+        classpath group: "net.minecraftforge.gradle", name: "ForgeGradle", version: "5.6.4"
+        classpath group: "com.github.jengelman.gradle.plugins", name: "shadow", version: "7.0.0"
     }
 }
 
 plugins {
-    id 'com.github.johnrengelman.shadow'
+    id 'com.github.johnrengelman.shadow' version '7.0.0'
 }
 
 apply from: "properties.gradle"
 
 apply plugin: "net.minecraftforge.gradle"
-//Only edit below this line, the above code adds and enables the necessary things for Forge to be setup.
 apply plugin: "eclipse"
 
 def branch
@@ -34,7 +34,7 @@ version = branch + '-' + modVersion + '.' + commits + (dirty ? '-dirty' : '')
 group = modGroup
 archivesBaseName = modBaseName
 
-sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = "1.8" // Need this here so eclipse task generates correctly.
+sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = "16"
 
 ext {
     compoundClassesDir = file('build/compound')
@@ -45,7 +45,7 @@ configurations {
 }
 
 minecraft {
-    mappings channel: "snapshot", version: mappingsVersion
+    mappings channel: "official", version: mappingsVersion
 
     runs {
         client {
@@ -54,7 +54,6 @@ minecraft {
                     sourceSets.main.output.classesDirs.asPath,
                     project.compoundClassesDir.absolutePath
             ].join(File.pathSeparator)
-
 
             workingDirectory project.file("run")
 
@@ -66,7 +65,7 @@ minecraft {
 
             mods {
                 movingworld {
-                    sources sourceSets.main
+                    source(sourceSets.main)
                 }
             }
         }
@@ -78,7 +77,6 @@ minecraft {
                     project.compoundClassesDir.absolutePath
             ].join(File.pathSeparator)
 
-
             workingDirectory project.file("run")
 
             // Recommended logging data for a userdev environment
@@ -89,7 +87,7 @@ minecraft {
 
             mods {
                 movingworld {
-                    sources sourceSets.main
+                    source(sourceSets.main)
                 }
             }
         }
@@ -97,7 +95,6 @@ minecraft {
 }
 
 repositories {
-    jcenter()
     mavenCentral()
     maven {
         url 'https://repo.tridevmc.com/'
@@ -106,7 +103,6 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${forgeVersion}"
-
     compile "com.tridevmc.compound:compound-all:${compoundVersion}"
     nonModDep "com.tridevmc.compound:compound-all:${compoundVersion}"
 }
@@ -126,25 +122,86 @@ shadowJar {
     dependencies {
         include(dependency("com.tridevmc.compound:compound-all:${compoundVersion}"))
     }
+	repositories {
+mavenCentral()
+maven { url = "https://maven.minecraftforge.net/" }
+maven { url = "https://repo.tridevmc.com/repository/maven-public/" }
+}
 
-    relocate "com.tridevmc.compound", "${group}.compound"
+dependencies {
+minecraft "net.minecraftforge:forge:${forgeVersion}"
+compileOnly "com.tridevmc.compound:compound-api:${compoundVersion}"
+runtimeOnly "com.tridevmc.compound:compound-all:${compoundVersion}"
+}
+
+task extractNonMod(type: Copy) {
+project.compoundClassesDir.delete()
+project.compoundClassesDir.mkdirs()
+from zipTree(project.configurations.runtimeOnly.singleFile)
+into project.compoundClassesDir
+}
+
+compileJava.dependsOn(extractNonMod)
+
+shadowJar {
+classifier = ""
+dependencies {
+include(dependency("com.tridevmc.compound:compound-all:${compoundVersion}"))
+}
+relocate "com.tridevmc.compound", "${group}.compound"
 }
 
 tasks.build.dependsOn shadowJar
 
 artifacts {
-    archives shadowJar
+archives shadowJar
 }
 
 // Example for how to get properties into the manifest for reading by the runtime..
 jar {
-    manifest {
-        attributes(["Specification-Title"     : "Moving World",
-                    "Specification-Vendor"    : "Trident",
-                    "Specification-Version"   : "24.0", // We are version 1 of the modlauncher specification
-                    "Implementation-Title"    : project.name,
-                    "Implementation-Version"  : "${version}",
-                    "Implementation-Vendor"   : "Trident",
-                    "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")],)
+manifest {
+attributes([
+"Specification-Title" : "Moving World",
+"Specification-Vendor" : "Trident",
+"Specification-Version" : "25.0", // We are version 2 of the modlauncher specification
+"Implementation-Title" : project.name,
+"Implementation-Version" : "${version}",
+"Implementation-Vendor" : "Trident",
+"Implementation-Timestamp" : new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+])
+}
+}
+
+minecraft {
+// Use the same mappings as the client and server (optional)
+// Note: 1.19.3 uses official mappings and therefore this line is not required.
+// mappings channel: "snapshot", version: mappingsVersion
+
+   // Define the client and server runs
+runs {
+    client {
+        // Add the mod's sources and resources to the classpath
+        modSources sourceSets.main
+        // Set the working directory to the 'run' folder
+        workingDirectory project.file("run")
+        // Add mod jars to the classpath (optional)
+        modJars configurations.modImplementation
+        // Set JVM arguments for the client run (optional)
+        property "forge.logging.markers", "REGISTRIES"
+        property "forge.logging.console.level", "debug"
     }
+    server {
+        // Add the mod's sources and resources to the classpath
+        modSources sourceSets.main
+        // Set the working directory to the 'run' folder
+        workingDirectory project.file("run")
+        // Add mod jars to the classpath (optional)
+        modJars configurations.modImplementation
+        // Set JVM arguments for the server run (optional)
+        property "forge.logging.markers", "REGISTRIES"
+        property "forge.logging.console.level", "debug"
+    }
+}
+
+
 }
