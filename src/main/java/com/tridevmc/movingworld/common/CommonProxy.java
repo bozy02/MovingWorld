@@ -5,12 +5,12 @@ import net.minecraft.world.World;
 import net.minecraft.world.dimension.DimensionType;
 import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.fml.LogicalSide;
-import net.minecraftforge.fml.LogicalSidedProvider;
+import net.minecraftforge.fml.server.ServerLifecycleHooks;
 
 public class CommonProxy {
 
     public World getWorld(int id) {
-        MinecraftServer currentServer = LogicalSidedProvider.INSTANCE.get(LogicalSide.SERVER);
+        MinecraftServer currentServer = ServerLifecycleHooks.getCurrentServer();
         return DimensionManager.getWorld(currentServer, DimensionType.getById(id), false, false);
     }
 
